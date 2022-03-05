@@ -4,44 +4,52 @@ import 'package:intl/intl.dart';
 import 'package:money_management/main.dart';
 import 'package:money_management/models/category/category_model.dart';
 import 'package:money_management/models/transaction/transaction_model.dart';
-import 'package:money_management/services/category/category_db.dart';
 import 'package:money_management/services/transaction/transaction_db.dart';
 
-class ScreenTransaction extends StatelessWidget {
-  const ScreenTransaction({Key? key}) : super(key: key);
+class DeletedTransactionList extends StatelessWidget {
+  final ScrollController controller;
+  final BuildContext sheetContext;
+  const DeletedTransactionList({
+    Key? key,
+    required this.controller,
+    required this.sheetContext,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    TransactionDb.instance.refresh();
-    CategoryDB.instance.refreshUI();
     return ValueListenableBuilder(
-      valueListenable: TransactionDb.instance.transactionListNotifier,
-      builder: (BuildContext ctx, List<TransactionModel> newList, Widget? _) {
+      valueListenable: TransactionDb.instance.deletedTransactionListNotifier,
+      builder:
+          (BuildContext ctx, List<TransactionModel> _transactions, Widget? _) {
         return ListView.separated(
             padding: const EdgeInsets.all(8.0),
+            controller: controller,
             itemBuilder: (ctx, index) {
-              final _value = newList[index];
+              final _transaction = _transactions[index];
               return Slidable(
-                key: Key(_value.id!),
+                key: Key(_transaction.id!),
                 startActionPane: ActionPane(
                   motion: const ScrollMotion(),
                   children: [
                     SlidableAction(
                       onPressed: (BuildContext ctx) {
-                        final _newTransaction = _value;
-                        _newTransaction.isDeleted = true;
-                        TransactionDb.instance
-                            .deleteTransaction(_newTransaction);
+                        final newTransaction = _transaction;
+                        newTransaction.isDeleted = false;
+                        TransactionDb.instance.deleteTransaction(_transaction);
+                        if (_transactions.length == 1) {
+                          Navigator.of(sheetContext).pop();
+                        }
                         showSnackBar(
                           context: context,
-                          message: '${_value.purpose} transaction deleted',
-                          backgroundColor: Colors.red,
+                          message:
+                              '${_transaction.purpose} transaction is restored',
+                          backgroundColor: Colors.green,
                         );
                       },
-                      icon: Icons.delete,
-                      label: 'Delete',
-                      // backgroundColor: Colors.red,
-                      foregroundColor: Colors.red,
+                      icon: Icons.restore_from_trash,
+                      label: 'Restore',
+                      backgroundColor: Colors.blue,
+                      // foregroundColor: Colors.blue,
                     )
                   ],
                 ),
@@ -50,17 +58,22 @@ class ScreenTransaction extends StatelessWidget {
                   children: [
                     SlidableAction(
                       onPressed: (BuildContext ctx) {
+                        TransactionDb.instance
+                            .deleteHardTransaction(_transaction.id!);
+                        if (_transactions.length == 1) {
+                          Navigator.of(sheetContext).pop();
+                        }
                         showSnackBar(
                           context: context,
                           message:
-                              '${_value.purpose} transaction update coming soon',
+                              '${_transaction.purpose} transaction deleted permanently',
                           backgroundColor: Colors.blue,
                         );
                       },
-                      icon: Icons.edit,
-                      label: 'Edit',
-                      // backgroundColor: Colors.blue,
-                      foregroundColor: Colors.blue,
+                      icon: Icons.delete,
+                      label: 'Delete',
+                      backgroundColor: Colors.red,
+                      // foregroundColor: Colors.red,
                     )
                   ],
                 ),
@@ -68,12 +81,13 @@ class ScreenTransaction extends StatelessWidget {
                   elevation: 0,
                   child: ListTile(
                     leading: CircleAvatar(
-                        backgroundColor: _value.type == CategoryType.income
-                            ? Colors.green
-                            : Colors.red,
+                        backgroundColor:
+                            _transaction.type == CategoryType.income
+                                ? Colors.green
+                                : Colors.red,
                         radius: 50,
                         child: Text(
-                          parseDate(_value.date),
+                          parseDate(_transaction.date),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                               color: Colors.white, fontWeight: FontWeight.w800),
@@ -81,16 +95,16 @@ class ScreenTransaction extends StatelessWidget {
                     title: Row(
                       children: [
                         Text(
-                          _value.purpose,
+                          _transaction.purpose,
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          ' (${_value.amount})',
-                          style: const TextStyle(fontWeight: FontWeight.w400),
+                          ' (${_transaction.amount})',
+                          style: const TextStyle(fontWeight: FontWeight.w300),
                         ),
                       ],
                     ),
-                    subtitle: Text(_value.category.name),
+                    subtitle: Text(_transaction.category.name),
                   ),
                 ),
               );
@@ -98,7 +112,7 @@ class ScreenTransaction extends StatelessWidget {
             separatorBuilder: (ctx, index) {
               return const SizedBox(height: 10);
             },
-            itemCount: newList.length);
+            itemCount: _transactions.length);
       },
     );
   }
